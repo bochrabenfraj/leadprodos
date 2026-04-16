@@ -1,5 +1,5 @@
 import { useState, useContext, useEffect } from 'react'
-import { AuthContext } from '../context/AuthContext'
+import { AuthContext } from '../components/context/AuthContext'
 
 export default function AdminResetPasswordPage() {
   const [users, setUsers] = useState([])
@@ -187,3 +187,4 @@ export default function AdminResetPasswordPage() {
     </div>
   )
 }
+

@@ -256,5 +256,104 @@ namespace LeadProdos.Backend.Services
 
             return true;
         }
+
+        public async Task<bool> ForgotPasswordAsync(ForgotPasswordRequest request, string resetBaseUrl)
+        {
+            if (string.IsNullOrEmpty(request?.Email))
+            {
+                throw new Exception("L'email est requis");
+            }
+
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+            if (user == null)
+            {
+                // Don't reveal if user exists (security best practice)
+                return true;
+            }
+
+            // Generate reset token
+            var resetToken = GenerateResetToken();
+            var tokenExpiry = DateTime.UtcNow.AddHours(24);
+
+            // Save token to database
+            var resetTokenRecord = new PasswordResetToken
+            {
+                Id = ObjectId.GenerateNewId().ToString(),
+                UserId = user.Id,
+                Email = user.Email,
+                Token = resetToken,
+                ExpiresAt = tokenExpiry,
+                IsUsed = false
+            };
+
+            _context.PasswordResetTokens.Add(resetTokenRecord);
+            await _context.SaveChangesAsync();
+
+            // TODO: Send email with reset link
+            // For now, just log the reset link for testing
+            Console.WriteLine($"\n🔐 Password Reset Link: {resetBaseUrl}?token={resetToken}");
+
+            return true;
+        }
+
+        public async Task<bool> ResetPasswordWithTokenAsync(ResetPasswordWithTokenRequest request)
+        {
+            if (string.IsNullOrEmpty(request?.Token) || string.IsNullOrEmpty(request?.NewPassword))
+            {
+                throw new Exception("Token et nouveau mot de passe sont requis");
+            }
+
+            if (request.NewPassword.Length < 6)
+            {
+                throw new Exception("Le nouveau mot de passe doit contenir au moins 6 caractères");
+            }
+
+            // Find and validate reset token
+            var resetToken = await _context.PasswordResetTokens
+                .FirstOrDefaultAsync(t => t.Token == request.Token && !t.IsUsed);
+
+            if (resetToken == null || resetToken.ExpiresAt < DateTime.UtcNow)
+            {
+                throw new Exception("Token invalide ou expiré");
+            }
+
+            // Get user and update password
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == resetToken.UserId);
+            if (user == null)
+            {
+                throw new Exception("Utilisateur non trouvé");
+            }
+
+            user.PasswordHash = HashPassword(request.NewPassword);
+            _context.Users.Update(user);
+
+            // Mark token as used
+            resetToken.IsUsed = true;
+            _context.PasswordResetTokens.Update(resetToken);
+
+            // Clean up expired tokens
+            var expiredTokens = await _context.PasswordResetTokens
+                .Where(t => t.ExpiresAt < DateTime.UtcNow)
+                .ToListAsync();
+            
+            if (expiredTokens.Any())
+            {
+                _context.PasswordResetTokens.RemoveRange(expiredTokens);
+            }
+
+            await _context.SaveChangesAsync();
+
+            return true;
+        }
+
+        private string GenerateResetToken()
+        {
+            var randomBytes = new byte[32];
+            using (var rng = RandomNumberGenerator.Create())
+            {
+                rng.GetBytes(randomBytes);
+            }
+            return Convert.ToBase64String(randomBytes).Replace("+", "-").Replace("/", "_").TrimEnd('=');
+        }
     }
 }

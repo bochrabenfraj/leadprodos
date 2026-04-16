@@ -1,168 +1,176 @@
-import { useState, useEffect } from 'react'
-import { getProducts, createProduct, deleteProduct } from '../services/api'
+import { useState, useEffect, useContext } from 'react'
+import { AuthContext } from '../components/context/AuthContext'
+import ProductFilter from '../components/ProductFilter'
+import { getProducts, createProduct, deleteProduct, updateProduct } from '../services/api'
+import '../styles/ProductsPage.css'
 
 export default function ProductsPage() {
-  const [products, setProducts] = useState([])
-  const [loading, setLoading] = useState(true)
+  const { user } = useContext(AuthContext)
+  
+  // Si ce n'est pas un Admin, afficher un message d'accès refusé
+  if (!user || user.role !== 'Admin') {
+    return (
+      <div style={{
+        padding: '3rem',
+        textAlign: 'center',
+        color: '#991b1b',
+        background: '#fee2e2',
+        borderRadius: '8px',
+        maxWidth: '600px',
+        margin: '3rem auto',
+        border: '2px solid #fca5a5'
+      }}>
+        <h2>❌ Accès Refusé</h2>
+        <p>Seul l'administrateur peut gérer les produits.</p>
+      </div>
+    )
+  }
+  
   const [showForm, setShowForm] = useState(false)
-  const [selectedCategory, setSelectedCategory] = useState('Tous')
+  const [editingId, setEditingId] = useState(null)
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     price: '',
+    stock: '',
     category: ''
   })
-
-  useEffect(() => {
-    loadProducts()
-  }, [])
-
-  const loadProducts = async () => {
-    try {
-      const response = await getProducts()
-      setProducts(response.data || [])
-    } catch (error) {
-      console.error('Error loading products:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
-      await createProduct(formData)
-      setFormData({ name: '', description: '', price: '', category: '' })
-      setShowForm(false)
-      loadProducts()
-    } catch (error) {
-      console.error('Error creating product:', error)
-    }
-  }
-
-  const handleDelete = async (id) => {
-    if (window.confirm('Êtes-vous sûr?')) {
-      try {
-        await deleteProduct(id)
-        loadProducts()
-      } catch (error) {
-        console.error('Error deleting product:', error)
+      if (editingId) {
+        await updateProduct(editingId, formData)
+        setEditingId(null)
+      } else {
+        await createProduct(formData)
       }
+      setFormData({ name: '', description: '', price: '', stock: '', category: '' })
+      setShowForm(false)
+      window.location.reload()
+    } catch (error) {
+      console.error('Error:', error)
     }
   }
 
-  // Extraire catégories uniques
-  const getCategories = () => {
-    const categories = [...new Set(products.map(p => p.category).filter(Boolean))]
-    return ['Tous', ...categories].sort()
+  const handleInputChange = (e) => {
+    const { name, value } = e.target
+    setFormData(prev => ({
+      ...prev,
+      [name]: name === 'price' || name === 'stock' ? parseFloat(value) : value
+    }))
   }
-
-  // Filtrer les produits par catégorie
-  const filteredProducts = selectedCategory === 'Tous' 
-    ? products 
-    : products.filter(p => p.category === selectedCategory)
 
   return (
-    <div className="container">
-      <h2>🛍️ Catalogue de Produits</h2>
-      <button onClick={() => setShowForm(!showForm)}>
-        {showForm ? 'Annuler' : '+ Ajouter un Produit'}
-      </button>
-
-      {/* Filtrage par catégorie */}
-      <div style={{ 
-        marginTop: '1.5rem', 
-        marginBottom: '1.5rem', 
-        display: 'flex', 
-        gap: '0.5rem', 
-        flexWrap: 'wrap',
-        alignItems: 'center'
-      }}>
-        <span style={{ fontWeight: 600, color: '#374151' }}>Catégories:</span>
-        {getCategories().map(category => (
-          <button
-            key={category}
-            onClick={() => setSelectedCategory(category)}
-            style={{
-              padding: '0.5rem 1rem',
-              background: selectedCategory === category ? '#667eea' : '#e5e7eb',
-              color: selectedCategory === category ? 'white' : '#374151',
-              border: 'none',
-              borderRadius: '20px',
-              cursor: 'pointer',
-              fontWeight: selectedCategory === category ? 600 : 500,
-              transition: 'all 0.2s'
-            }}
-          >
-            {category}
-          </button>
-        ))}
+    <div className="products-page">
+      <div className="page-header">
+        <h1>🛍️ Product Catalog</h1>
+        <button 
+          className="btn-add-product"
+          onClick={() => {
+            setShowForm(!showForm)
+            setEditingId(null)
+            setFormData({ name: '', description: '', price: '', stock: '', category: '' })
+          }}
+        >
+          {showForm ? '✕ Cancel' : '+ Add Product'}
+        </button>
       </div>
 
       {showForm && (
-        <form onSubmit={handleSubmit} style={{ marginTop: '2rem' }}>
-          <label>Nom du Produit</label>
-          <input
-            type="text"
-            required
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          />
-          <label>Description</label>
-          <textarea
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-          />
-          <label>Prix</label>
-          <input
-            type="number"
-            step="0.01"
-            required
-            value={formData.price}
-            onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-          />
-          <label>Catégorie</label>
-          <input
-            type="text"
-            value={formData.category}
-            onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-          />
-          <button type="submit">Créer Produit</button>
-        </form>
+        <div className="form-container">
+          <h3>{editingId ? 'Edit Product' : 'Add New Product'}</h3>
+          <form onSubmit={handleSubmit}>
+            <div className="form-group">
+              <label>Product Name *</label>
+              <input
+                type="text"
+                name="name"
+                value={formData.name}
+                onChange={handleInputChange}
+                required
+                placeholder="e.g., Arduino Uno"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Description *</label>
+              <textarea
+                name="description"
+                value={formData.description}
+                onChange={handleInputChange}
+                required
+                placeholder="Product description..."
+                rows="3"
+              ></textarea>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Category *</label>
+                <input
+                  type="text"
+                  name="category"
+                  value={formData.category}
+                  onChange={handleInputChange}
+                  required
+                  placeholder="e.g., Cartes Électroniques"
+                  list="categories"
+                />
+                <datalist id="categories">
+                  <option value="Cartes Électroniques" />
+                  <option value="Mini Robots" />
+                  <option value="Composants Électroniques" />
+                  <option value="Kits IoT" />
+                  <option value="Outils Électroniques" />
+                  <option value="Audio" />
+                  <option value="Caméras" />
+                  <option value="Drones" />
+                  <option value="Smartphones" />
+                  <option value="Tablettes" />
+                  <option value="Ordinateurs" />
+                  <option value="Téléviseurs" />
+                  <option value="Wearables" />
+                </datalist>
+              </div>
+
+              <div className="form-group">
+                <label>Price ($) *</label>
+                <input
+                  type="number"
+                  name="price"
+                  value={formData.price}
+                  onChange={handleInputChange}
+                  required
+                  placeholder="0.00"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Stock *</label>
+                <input
+                  type="number"
+                  name="stock"
+                  value={formData.stock}
+                  onChange={handleInputChange}
+                  required
+                  placeholder="0"
+                  min="0"
+                />
+              </div>
+            </div>
+
+            <button type="submit" className="btn-submit">
+              {editingId ? 'Update' : 'Create'} Product
+            </button>
+          </form>
+        </div>
       )}
 
-      {loading ? (
-        <p>Chargement des produits...</p>
-      ) : filteredProducts.length > 0 ? (
-        <table>
-          <thead>
-            <tr>
-              <th>Nom</th>
-              <th>Description</th>
-              <th>Prix</th>
-              <th>Catégorie</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredProducts.map(product => (
-              <tr key={product.id}>
-                <td>{product.name}</td>
-                <td>{product.description}</td>
-                <td>{product.price}€</td>
-                <td>{product.category}</td>
-                <td>
-                  <button className="delete" onClick={() => handleDelete(product.id)}>
-                    Supprimer
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      ) : (
-        <p>Aucun produit trouvé dans cette catégorie.</p>
-      )}
+      <ProductFilter />
     </div>
   )
 }
+

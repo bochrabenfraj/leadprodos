@@ -8,7 +8,7 @@ namespace LeadProdos.Backend.Controllers
 {
     [Authorize]
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/admin/[controller]")]
     public class UsersController : ControllerBase
     {
         private readonly IUserService _userService;
@@ -40,6 +40,8 @@ namespace LeadProdos.Backend.Controllers
             try
             {
                 var user = await _userService.GetUserByIdAsync(id);
+                if (user == null)
+                    return NotFound(new { message = "Utilisateur non trouvé" });
                 return Ok(user);
             }
             catch (Exception ex)
@@ -84,6 +86,11 @@ namespace LeadProdos.Backend.Controllers
         {
             try
             {
+                // Vérifier que l'utilisateur existe avant suppression
+                var user = await _userService.GetUserByIdAsync(id);
+                if (user == null)
+                    return NotFound(new { message = "Utilisateur non trouvé" });
+
                 var result = await _userService.DeleteUserAsync(id);
                 return Ok(new { success = result, message = "Utilisateur supprimé avec succès" });
             }

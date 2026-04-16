@@ -64,5 +64,40 @@ namespace LeadProdos.Backend.Services
                 await _context.SaveChangesAsync();
             }
         }
+
+        public async Task<IEnumerable<Client>> SearchClientsAsync(string searchTerm, string company, decimal? minScore, decimal? maxScore)
+        {
+            var query = _context.Clients.AsQueryable();
+
+            // Filter by search term (name, email, phone)
+            if (!string.IsNullOrEmpty(searchTerm))
+            {
+                var lowerSearchTerm = searchTerm.ToLower();
+                query = query.Where(c =>
+                    c.Name.ToLower().Contains(lowerSearchTerm) ||
+                    c.Email.ToLower().Contains(lowerSearchTerm) ||
+                    (c.Phone != null && c.Phone.ToLower().Contains(lowerSearchTerm))
+                );
+            }
+
+            // Filter by company
+            if (!string.IsNullOrEmpty(company) && company != "Non spécifié")
+            {
+                query = query.Where(c => c.Company == company);
+            }
+
+            // Filter by interest score range
+            if (minScore.HasValue)
+            {
+                query = query.Where(c => c.InterestScore >= minScore.Value);
+            }
+
+            if (maxScore.HasValue)
+            {
+                query = query.Where(c => c.InterestScore <= maxScore.Value);
+            }
+
+            return await query.ToListAsync();
+        }
     }
 }

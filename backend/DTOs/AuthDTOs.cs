@@ -95,4 +95,28 @@ namespace LeadProdos.Backend.DTOs
         public bool IsActive { get; set; }
         public DateTime CreatedAt { get; set; }
     }
+
+    public class ForgotPasswordRequest
+    {
+        [JsonPropertyName("email")]
+        public string Email { get; set; }
+    }
+
+    public class ResetPasswordWithTokenRequest
+    {
+        [JsonPropertyName("token")]
+        public string Token { get; set; }
+
+        [JsonPropertyName("newPassword")]
+        public string NewPassword { get; set; }
+    }
+
+    public class ForgotPasswordResponse
+    {
+        [JsonPropertyName("success")]
+        public bool Success { get; set; }
+
+        [JsonPropertyName("message")]
+        public string Message { get; set; }
+    }
 }

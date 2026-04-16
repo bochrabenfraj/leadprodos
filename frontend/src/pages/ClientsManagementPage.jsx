@@ -1,5 +1,6 @@
 import { useState, useEffect, useContext } from 'react'
-import { AuthContext } from '../context/AuthContext'
+import { AuthContext } from '../components/context/AuthContext'
+import { getClients, createClient, updateClient, deleteClient } from '../services/api'
 
 export default function ClientsManagementPage() {
   const [clients, setClients] = useState([])
@@ -7,6 +8,8 @@ export default function ClientsManagementPage() {
   const [error, setError] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [confirmAction, setConfirmAction] = useState(null)
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -26,27 +29,11 @@ export default function ClientsManagementPage() {
   const fetchClients = async () => {
     try {
       setLoading(true)
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/clients', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-      if (!response.ok) {
-        let errorData
-        try {
-          errorData = await response.json()
-        } catch {
-          errorData = { message: `Erreur ${response.status}` }
-        }
-        const errorMsg = errorData.message || errorData.error || `Erreur ${response.status}`
-        throw new Error(errorMsg)
-      }
-      const data = await response.json()
-      setClients(data)
+      const response = await getClients()
+      setClients(response.data || [])
       setError('')
     } catch (err) {
-      setError(err.message)
+      setError(err.message || 'Erreur lors du chargement des clients')
     } finally {
       setLoading(false)
     }
@@ -64,7 +51,6 @@ export default function ClientsManagementPage() {
     e.preventDefault()
     try {
       setLoading(true)
-      const token = localStorage.getItem('token')
       
       if (!formData.name || !formData.email) {
         setError('Veuillez remplir les champs obligatoires')
@@ -77,39 +63,30 @@ export default function ClientsManagementPage() {
         phone: formData.phone || '',
         company: formData.company || '',
         socialMediaProfiles: formData.socialMediaProfiles || '',
-        interestScore: parseFloat(formData.interestScore) || 0
+        interestScore: parseInt(formData.interestScore) || 0
       }
 
-      const url = editingId ? `/api/clients/${editingId}` : '/api/clients'
-      const method = editingId ? 'PUT' : 'POST'
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      })
-
-      if (!response.ok) {
-        let errorData
-        try {
-          errorData = await response.json()
-        } catch {
-          errorData = { message: `Erreur ${response.status}` }
-        }
-        const errorMsg = errorData.message || errorData.error || `Erreur ${response.status}`
-        throw new Error(errorMsg)
+      console.log('📤 Envoi du payload:', payload)
+      console.log('📝 Mode:', editingId ? 'Modification' : 'Création')
+      
+      if (editingId) {
+        console.log(`🔄 Modification du client ${editingId}`)
+        await updateClient(editingId, payload)
+      } else {
+        console.log('✨ Création d\'un nouveau client')
+        await createClient(payload)
       }
 
+      console.log('✅ Succès!')
       fetchClients()
       setShowForm(false)
       setEditingId(null)
       setFormData({ name: '', email: '', phone: '', company: '', socialMediaProfiles: '', interestScore: '0' })
       setError('')
     } catch (err) {
-      setError(err.message)
+      console.error('❌ Erreur complète:', err)
+      const errorMessage = err.response?.data?.message || err.response?.data?.error || err.message || 'Erreur lors de l\'enregistrement'
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -117,38 +94,42 @@ export default function ClientsManagementPage() {
 
   const handleEdit = (client) => {
     setFormData({
-      name: client.name,
-      email: client.email,
+      name: client.name || '',
+      email: client.email || '',
       phone: client.phone || '',
       company: client.company || '',
       socialMediaProfiles: client.socialMediaProfiles || '',
-      interestScore: client.interestScore
+      interestScore: String(client.interestScore || '0')
     })
     setEditingId(client.id)
     setShowForm(true)
   }
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer ce client ?')) return
+    setConfirmAction({ type: 'delete-client', id, name: clients.find(c => c.id === id)?.name })
+    setShowConfirmModal(true)
+  }
+
+  const handleConfirmAction = async () => {
+    if (!confirmAction) return
 
     try {
       setLoading(true)
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/clients/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-
-      if (!response.ok) throw new Error('Erreur lors de la suppression')
+      await deleteClient(confirmAction.id)
       fetchClients()
       setError('')
+      setShowConfirmModal(false)
+      setConfirmAction(null)
     } catch (err) {
-      setError(err.message)
+      setError(err.message || 'Erreur lors de la suppression')
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleCancelAction = () => {
+    setShowConfirmModal(false)
+    setConfirmAction(null)
   }
 
   const resetForm = () => {
@@ -159,9 +140,88 @@ export default function ClientsManagementPage() {
 
   if (authLoading) return <div style={{ padding: '2rem', textAlign: 'center' }}>Chargement...</div>
 
+  if (!user || user.role !== 'Admin') {
+    return (
+      <div style={{
+        padding: '3rem',
+        textAlign: 'center',
+        color: '#991b1b',
+        background: '#fee2e2',
+        borderRadius: '8px',
+        maxWidth: '600px',
+        margin: '3rem auto',
+        border: '2px solid #fca5a5'
+      }}>
+        <h2>❌ Accès Refusé</h2>
+        <p>Seul l'administrateur peut gérer les clients.</p>
+      </div>
+    )
+  }
+
   return (
     <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
       <h1 style={{ marginBottom: '2rem', color: '#1f2937' }}>Gestion des Clients 👥</h1>
+
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 50
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '8px',
+            padding: '2rem',
+            maxWidth: '400px',
+            width: '90%',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.2)'
+          }}>
+            <h2 style={{ marginTop: 0, color: '#1f2937', marginBottom: '1rem' }}>Confirmer la suppression</h2>
+            <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>
+              Êtes-vous sûr de vouloir supprimer le client <strong>{confirmAction?.name}</strong> ? Cette action est irréversible.
+            </p>
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+              <button
+                onClick={handleCancelAction}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: '#e5e7eb',
+                  color: '#374151',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleConfirmAction}
+                disabled={loading}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: loading ? '#d1d5db' : '#ef4444',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontWeight: 600,
+                  cursor: loading ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {loading ? 'Suppression...' : 'Supprimer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div style={{
@@ -441,3 +501,4 @@ export default function ClientsManagementPage() {
     </div>
   )
 }
+

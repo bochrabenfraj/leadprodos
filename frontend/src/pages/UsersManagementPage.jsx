@@ -1,5 +1,5 @@
 import { useState, useContext, useEffect } from 'react'
-import { AuthContext } from '../context/AuthContext'
+import { AuthContext } from '../components/context/AuthContext'
 
 export default function UsersManagementPage() {
   const [users, setUsers] = useState([])
@@ -11,9 +11,11 @@ export default function UsersManagementPage() {
     username: '',
     email: '',
     password: '',
-    role: 'User'
+    role: 'Commercial'
   })
   const [editingId, setEditingId] = useState(null)
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [confirmAction, setConfirmAction] = useState(null)
   const { user } = useContext(AuthContext)
 
   useEffect(() => {
@@ -25,7 +27,7 @@ export default function UsersManagementPage() {
   const fetchUsers = async () => {
     try {
       const token = localStorage.getItem('token')
-      const response = await fetch('http://localhost:5000/api/users', {
+      const response = await fetch('http://localhost:5000/api/admin/users', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -57,7 +59,7 @@ export default function UsersManagementPage() {
 
     try {
       const token = localStorage.getItem('token')
-      const response = await fetch('http://localhost:5000/api/users', {
+      const response = await fetch('http://localhost:5000/api/admin/users', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -78,7 +80,7 @@ export default function UsersManagementPage() {
       }
 
       setSuccessMessage('Utilisateur créé avec succès!')
-      setFormData({ username: '', email: '', password: '', role: 'User' })
+      setFormData({ username: '', email: '', password: '', role: 'Commercial' })
       setShowForm(false)
       fetchUsers()
     } catch (err) {
@@ -86,52 +88,86 @@ export default function UsersManagementPage() {
     }
   }
 
-  const handleDeleteUser = async (id) => {
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur?')) {
-      return
-    }
-
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`http://localhost:5000/api/users/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-
-      if (!response.ok) {
-        throw new Error('Erreur lors de la suppression')
-      }
-
-      setSuccessMessage('Utilisateur supprimé avec succès!')
-      fetchUsers()
-    } catch (err) {
-      setError(err.message)
-    }
+  const handleDeleteUser = (id, username) => {
+    setConfirmAction({
+      type: 'delete-user',
+      id,
+      message: `Êtes-vous sûr de vouloir supprimer l'utilisateur "${username}" ? Cette action est irréversible.`
+    })
+    setShowConfirmModal(true)
   }
 
-  const handleToggleStatus = async (id, currentStatus) => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`http://localhost:5000/api/users/${id}/toggle-status`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`
+  const handleToggleStatus = (id, currentStatus, username) => {
+    const newStatus = currentStatus ? 'désactiver' : 'activer'
+    setConfirmAction({
+      type: 'toggle-status',
+      id,
+      currentStatus,
+      message: `Êtes-vous sûr de vouloir ${newStatus} le compte de "${username}" ?`
+    })
+    setShowConfirmModal(true)
+  }
+
+  const handleConfirmAction = async () => {
+    if (!confirmAction) return
+
+    if (confirmAction.type === 'toggle-status') {
+      try {
+        const token = localStorage.getItem('token')
+        const response = await fetch(`http://localhost:5000/api/admin/users/${confirmAction.id}/toggle-status`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        })
+
+        const data = await response.json()
+
+        if (!response.ok) {
+          throw new Error(data.message || 'Erreur lors de la modification')
         }
-      })
 
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Erreur lors de la modification')
+        setSuccessMessage(data.message)
+        fetchUsers()
+      } catch (err) {
+        setError(err.message)
       }
+    } else if (confirmAction.type === 'delete-user') {
+      try {
+        const token = localStorage.getItem('token')
+        const response = await fetch(`http://localhost:5000/api/admin/users/${confirmAction.id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        })
 
-      setSuccessMessage(data.message)
-      fetchUsers()
-    } catch (err) {
-      setError(err.message)
+        const data = await response.json()
+
+        if (response.status === 401) {
+          setError('❌ Session expirée. Veuillez vous reconnecter.')
+        } else if (response.status === 403) {
+          setError('❌ Accès refusé - Vous n\'avez pas les droits d\'administrateur.')
+        } else if (response.status === 404) {
+          setError('❌ Utilisateur introuvable.')
+        } else if (!response.ok) {
+          setError(data.message || 'Erreur lors de la suppression')
+        } else {
+          setSuccessMessage('✅ Utilisateur supprimé avec succès!')
+          fetchUsers()
+        }
+      } catch (err) {
+        setError(`❌ ${err.message}`)
+      }
     }
+
+    setShowConfirmModal(false)
+    setConfirmAction(null)
+  }
+
+  const handleCancelAction = () => {
+    setShowConfirmModal(false)
+    setConfirmAction(null)
   }
 
   const handleEditUser = async (e) => {
@@ -156,7 +192,7 @@ export default function UsersManagementPage() {
         body.password = formData.password
       }
 
-      const response = await fetch(`http://localhost:5000/api/users/${editingId}`, {
+      const response = await fetch(`http://localhost:5000/api/admin/users/${editingId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -178,7 +214,7 @@ export default function UsersManagementPage() {
 
       setSuccessMessage('Utilisateur modifié avec succès!')
       setEditingId(null)
-      setFormData({ username: '', email: '', password: '', role: 'User' })
+      setFormData({ username: '', email: '', password: '', role: 'Commercial' })
       setShowForm(false)
       fetchUsers()
     } catch (err) {
@@ -199,7 +235,7 @@ export default function UsersManagementPage() {
 
   const cancelEdit = () => {
     setEditingId(null)
-    setFormData({ username: '', email: '', password: '', role: 'User' })
+    setFormData({ username: '', email: '', password: '', role: 'Commercial' })
     setShowForm(false)
   }
 
@@ -256,7 +292,7 @@ export default function UsersManagementPage() {
               onMouseOver={(e) => e.target.style.backgroundColor = '#d97706'}
               onMouseOut={(e) => e.target.style.backgroundColor = '#f59e0b'}
             >
-              🔐 Réinitialiser mot de passe
+              🔐 Modifier mot de passe
             </a>
             <button 
               onClick={() => editingId ? cancelEdit() : setShowForm(!showForm)}
@@ -274,7 +310,7 @@ export default function UsersManagementPage() {
               onMouseOver={(e) => e.target.style.backgroundColor = showForm ? '#dc2626' : '#059669'}
               onMouseOut={(e) => e.target.style.backgroundColor = showForm ? '#ef4444' : '#10b981'}
             >
-              {showForm ? '❌ Annuler' : '➕ Nouvel utilisateur'}
+              {showForm ? '❌ Annuler' : '➕ Créer Commercial'}
             </button>
           </div>
         </div>
@@ -417,7 +453,7 @@ export default function UsersManagementPage() {
                   onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
                   onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
                 >
-                  <option value="User">👤 Utilisateur</option>
+                  <option value="Commercial">👤 Commercial</option>
                   <option value="Admin">🔐 Administrateur</option>
                 </select>
               </div>
@@ -505,7 +541,7 @@ export default function UsersManagementPage() {
                       fontSize: '0.875rem',
                       display: 'inline-block'
                     }}>
-                      {usr.role === 'Admin' ? '🔐 Admin' : '👤 Utilisateur'}
+                      {usr.role === 'Admin' ? '🔐 Admin' : '👤 Commercial'}
                     </span>
                   </td>
                   <td style={{ padding: '1rem' }}>
@@ -543,7 +579,7 @@ export default function UsersManagementPage() {
                         ✏️ Modifier
                       </button>
                       <button
-                        onClick={() => handleToggleStatus(usr.id, usr.isActive)}
+                        onClick={() => handleToggleStatus(usr.id, usr.isActive, usr.username)}
                         title={usr.isActive ? 'Désactiver' : 'Activer'}
                         style={{
                           backgroundColor: usr.isActive ? '#ef4444' : '#10b981',
@@ -562,7 +598,7 @@ export default function UsersManagementPage() {
                         {usr.isActive ? '⏸️ Désactiver' : '▶️ Activer'}
                       </button>
                       <button
-                        onClick={() => handleDeleteUser(usr.id)}
+                        onClick={() => handleDeleteUser(usr.id, usr.username)}
                         title="Supprimer l'utilisateur"
                         style={{
                           backgroundColor: '#ef4444',
@@ -646,6 +682,77 @@ export default function UsersManagementPage() {
           </div>
         </div>
       </div>
+
+      {/* Modal de confirmation */}
+      {showConfirmModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            padding: '2rem',
+            maxWidth: '400px',
+            width: '90%',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
+          }}>
+            <h2 style={{ fontSize: '1.3rem', color: '#1f2937', margin: '0 0 1rem 0' }}>
+              ⚠️ Confirmation
+            </h2>
+            <p style={{ color: '#6b7280', marginBottom: '2rem', fontSize: '1rem' }}>
+              {confirmAction?.message}
+            </p>
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+              <button
+                onClick={handleCancelAction}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  backgroundColor: '#f3f4f6',
+                  color: '#374151',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  fontSize: '0.95rem',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#e5e7eb'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = '#f3f4f6'}
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleConfirmAction}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  border: 'none',
+                  borderRadius: '6px',
+                  backgroundColor: '#ef4444',
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  fontSize: '0.95rem',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#dc2626'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = '#ef4444'}
+              >
+                Confirmer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
+

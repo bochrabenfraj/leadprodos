@@ -22,15 +22,23 @@ namespace LeadProdos.Backend.Controllers
         {
             try
             {
+                // Validation des champs (400 Bad Request)
+                if (string.IsNullOrEmpty(request?.Email) || string.IsNullOrEmpty(request?.Password))
+                {
+                    return BadRequest(new { message = "Email et mot de passe sont requis" });
+                }
+
                 var response = await _authService.LoginAsync(request);
                 return Ok(response);
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                // Erreur d'authentification (email not found ou password incorrect) → 401
+                return Unauthorized(new { message = ex.Message });
             }
         }
 
+        [Authorize(Roles = "Admin")]
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterRequest request)
         {
@@ -46,7 +54,7 @@ namespace LeadProdos.Backend.Controllers
         }
 
         [Authorize]
-        [HttpPost("change-password")]
+        [HttpPut("change-password")]
         public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
         {
             try
@@ -68,6 +76,36 @@ namespace LeadProdos.Backend.Controllers
             {
                 var result = await _authService.ResetPasswordAsync(request);
                 return Ok(new { success = result, message = "Mot de passe réinitialisé avec succès" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpPost("forgot-password")]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+        {
+            try
+            {
+                // Get the reset URL from request header or configuration
+                var resetBaseUrl = $"{Request.Scheme}://{Request.Host}/reset-password";
+                var result = await _authService.ForgotPasswordAsync(request, resetBaseUrl);
+                return Ok(new { success = result, message = "Si l'email existe, un lien de réinitialisation a été envoyé" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpPost("reset-password-with-token")]
+        public async Task<IActionResult> ResetPasswordWithToken([FromBody] ResetPasswordWithTokenRequest request)
+        {
+            try
+            {
+                var result = await _authService.ResetPasswordWithTokenAsync(request);
+                return Ok(new { success = result, message = "Mot de passe réinitialisé avec succès. Connectez-vous avec votre nouveau mot de passe" });
             }
             catch (Exception ex)
             {

@@ -1,43 +1,98 @@
 import { useState, useEffect, useContext } from 'react'
-import { AuthContext } from '../context/AuthContext'
+import { AuthContext } from '../components/context/AuthContext'
 import { Link } from 'react-router-dom'
+import { searchClients, getClients } from '../services/api'
 
 export default function ClientsViewPage() {
   const [clients, setClients] = useState([])
+  const [allClients, setAllClients] = useState([]) // Store all clients for company extraction
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
+  const [selectedCompanies, setSelectedCompanies] = useState([])
+  const [scoreFilter, setScoreFilter] = useState('all') // 'all', 'high', 'medium', 'low'
   const { user } = useContext(AuthContext)
 
   useEffect(() => {
-    fetchClients()
+    fetchAllClients() // Fetch all to get companies list
   }, [])
 
-  const fetchClients = async () => {
+  // Refetch when filters change
+  useEffect(() => {
+    // Only search if filters are actually applied
+    if (searchTerm || selectedCompanies.length > 0 || scoreFilter !== 'all') {
+      performSearch()
+    } else {
+      // Reset to show all clients from allClients if no filters
+      setClients(allClients)
+      setError('')
+    }
+  }, [searchTerm, selectedCompanies, scoreFilter, allClients])
+
+  const fetchAllClients = async () => {
     try {
       setLoading(true)
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/clients', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-      if (!response.ok) throw new Error('Erreur lors du chargement des clients')
-      const data = await response.json()
-      setClients(data)
+      const response = await getClients()
+      setAllClients(response.data || [])
+      setClients(response.data || [])
       setError('')
     } catch (err) {
-      setError(err.message)
+      console.error('Error loading clients:', err)
+      setError(err.message || 'Erreur lors du chargement des clients')
     } finally {
       setLoading(false)
     }
   }
 
-  const filteredClients = clients.filter(client =>
-    client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.company?.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const performSearch = async () => {
+    try {
+      setLoading(true)
+      
+      // Calculate score range from filter
+      let minScore = undefined
+      let maxScore = undefined
+      
+      if (scoreFilter === 'high') {
+        minScore = 70
+      } else if (scoreFilter === 'medium') {
+        minScore = 40
+        maxScore = 69
+      } else if (scoreFilter === 'low') {
+        maxScore = 39
+      }
+
+      // Prepare company filter
+      const companyFilter = selectedCompanies.length > 0 
+        ? selectedCompanies[0] // Single selection for API
+        : ''
+
+      const response = await searchClients(
+        searchTerm,
+        companyFilter,
+        minScore,
+        maxScore
+      )
+      
+      setClients(response.data || [])
+      setError('')
+    } catch (err) {
+      setError(err.message || 'Erreur lors de la recherche')
+      setClients([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Get unique companies
+  const companies = [...new Set(allClients.map(c => c.company || 'Non spécifié'))]
+
+  const toggleCompany = (company) => {
+    setSelectedCompanies(prev =>
+      prev.includes(company)
+        ? prev.filter(c => c !== company)
+        : [company] // Only one company at a time for API
+    )
+  }
 
   if (loading) {
     return <div style={{ padding: '2rem', textAlign: 'center', fontSize: '1.2rem' }}>Chargement des clients...</div>
@@ -47,16 +102,18 @@ export default function ClientsViewPage() {
     <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <h1 style={{ color: '#1f2937', margin: 0 }}>Annuaire des Clients 👥</h1>
-        <Link to="/clients/manage" style={{
-          padding: '0.75rem 1.5rem',
-          background: '#667eea',
-          color: 'white',
-          textDecoration: 'none',
-          borderRadius: '6px',
-          fontWeight: 600
-        }}>
-          ⚙️ Gérer les clients
-        </Link>
+        {user && user.role === 'Admin' && (
+          <Link to="/clients/manage" style={{
+            padding: '0.75rem 1.5rem',
+            background: '#667eea',
+            color: 'white',
+            textDecoration: 'none',
+            borderRadius: '6px',
+            fontWeight: 600
+          }}>
+            ⚙️ Gérer les clients
+          </Link>
+        )}
       </div>
 
       {error && (
@@ -75,7 +132,7 @@ export default function ClientsViewPage() {
       <div style={{ marginBottom: '2rem' }}>
         <input
           type="text"
-          placeholder="🔍 Rechercher un client..."
+          placeholder="🔍 Rechercher un client (nom, email, téléphone)..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           style={{
@@ -88,7 +145,84 @@ export default function ClientsViewPage() {
         />
       </div>
 
-      {filteredClients.length === 0 ? (
+      {/* Filters Section */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: '1.5rem',
+        marginBottom: '2rem',
+        padding: '1.5rem',
+        background: '#f9fafb',
+        borderRadius: '8px',
+        border: '1px solid #e5e7eb'
+      }}>
+        {/* Company Filter */}
+        <div>
+          <h3 style={{ margin: '0 0 1rem 0', color: '#1f2937', fontSize: '0.95rem', fontWeight: 600 }}>
+            🏢 Entreprises
+          </h3>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+            {companies.length > 0 ? (
+              companies.map(company => (
+                <button
+                  key={company}
+                  onClick={() => toggleCompany(company)}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: selectedCompanies.includes(company) ? '#667eea' : '#e5e7eb',
+                    color: selectedCompanies.includes(company) ? 'white' : '#374151',
+                    border: 'none',
+                    borderRadius: '9999px',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    fontSize: '0.85rem',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  {company}
+                </button>
+              ))
+            ) : (
+              <span style={{ color: '#6b7280', fontSize: '0.9rem' }}>Aucune entreprise disponible</span>
+            )}
+          </div>
+        </div>
+
+        {/* Interest Score Filter */}
+        <div>
+          <h3 style={{ margin: '0 0 1rem 0', color: '#1f2937', fontSize: '0.95rem', fontWeight: 600 }}>
+            ⭐ Score d'Intérêt
+          </h3>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {[
+              { value: 'all', label: 'Tous les clients' },
+              { value: 'high', label: '🔥 Très intéressés (70+)' },
+              { value: 'medium', label: '👍 Intéressés (40-69)' },
+              { value: 'low', label: '⏳ Peu intéressés (<40)' }
+            ].map(option => (
+              <button
+                key={option.value}
+                onClick={() => setScoreFilter(option.value)}
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: scoreFilter === option.value ? '#667eea' : '#e5e7eb',
+                  color: scoreFilter === option.value ? 'white' : '#374151',
+                  border: 'none',
+                  borderRadius: '9999px',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  fontSize: '0.85rem',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {clients.length === 0 ? (
         <div style={{
           padding: '3rem 2rem',
           textAlign: 'center',
@@ -104,7 +238,7 @@ export default function ClientsViewPage() {
           gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
           gap: '1.5rem'
         }}>
-          {filteredClients.map(client => (
+          {clients.map(client => (
             <div
               key={client.id}
               style={{
@@ -202,3 +336,4 @@ export default function ClientsViewPage() {
     </div>
   )
 }
+

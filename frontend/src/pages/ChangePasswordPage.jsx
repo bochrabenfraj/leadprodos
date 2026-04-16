@@ -1,6 +1,7 @@
-import { useState, useContext } from 'react'
+import { useState, useContext, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AuthContext } from '../context/AuthContext'
+import { AuthContext } from '../components/context/AuthContext'
+import { changePassword } from '../services/api'
 
 export default function ChangePasswordPage() {
   const [email, setEmail] = useState('')
@@ -13,11 +14,19 @@ export default function ChangePasswordPage() {
   const { user } = useContext(AuthContext)
   const navigate = useNavigate()
 
+  // Pré-remplir l'email avec celui de l'utilisateur connecté
+  useEffect(() => {
+    if (user?.email) {
+      setEmail(user.email)
+    }
+  }, [user])
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
     setSuccess('')
 
+    // Validation frontend
     if (!email || !oldPassword || !newPassword || !confirmPassword) {
       setError('Veuillez remplir tous les champs')
       return
@@ -40,29 +49,27 @@ export default function ChangePasswordPage() {
 
     setLoading(true)
     try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('http://localhost:5000/api/auth/change-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ email, oldPassword, newPassword })
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Erreur lors du changement de mot de passe')
-      }
+      // Appel au service API via api.js avec gestion JWT automatique
+      await changePassword(email, oldPassword, newPassword)
 
       setSuccess('Mot de passe modifié avec succès!')
       setTimeout(() => {
         navigate('/dashboard')
       }, 2000)
     } catch (error) {
-      console.error('Erreur:', error)
-      setError(error.message)
+      console.error('Erreur changement de mot de passe:', error)
+      
+      // Gestion spécifique des codes d'erreur HTTP
+      if (error.response?.status === 401) {
+        // La redirection est gérée par l'interceptor axios
+        setError('Session expirée. Veuillez vous reconnecter.')
+      } else if (error.response?.status === 400) {
+        // Erreur 400 - afficher le message du backend
+        const errorMessage = error.response?.data?.message || 'Erreur lors du changement de mot de passe'
+        setError(errorMessage)
+      } else {
+        setError(error.message || 'Erreur lors du changement de mot de passe')
+      }
     } finally {
       setLoading(false)
     }
@@ -82,10 +89,13 @@ export default function ChangePasswordPage() {
   return (
     <div className="auth-container">
       <div className="auth-card">
-        <h2>Changer le mot de passe</h2>
+        <h2>Changer mon mot de passe</h2>
+        <p style={{ color: '#6b7280', marginBottom: '1.5rem', fontSize: '0.95rem' }}>
+          Modifiez votre mot de passe pour sécuriser votre compte
+        </p>
         
         {error && <div className="auth-error">{error}</div>}
-        {success && <div style={{ backgroundColor: '#d1fae5', color: '#065f46', border: '1px solid #6ee7b7', padding: '1rem', borderRadius: '6px', marginBottom: '1.5rem', fontWeight: 500 }}>{success}</div>}
+        {success && <div style={{ backgroundColor: '#d1fae5', color: '#065f46', border: '1px solid #6ee7b7', padding: '1rem', borderRadius: '6px', marginBottom: '1.5rem', fontWeight: 500 }}>✅ {success}</div>}
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
@@ -96,6 +106,7 @@ export default function ChangePasswordPage() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="votre@email.com"
               disabled={loading}
+              title="Cet email est pré-rempli automatiquement"
             />
           </div>
 
@@ -144,3 +155,4 @@ export default function ChangePasswordPage() {
     </div>
   )
 }
+

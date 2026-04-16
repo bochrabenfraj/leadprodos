@@ -1,6 +1,6 @@
 import { useState, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
+import { AuthContext } from '../components/context/AuthContext';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -243,9 +243,9 @@ export default function LoginPage() {
                 />
                 Se souvenir de moi
               </label>
-              <a href="#" style={{ color: '#667eea', textDecoration: 'none', fontWeight: 600 }}>
+              <Link to="/forgot-password" style={{ color: '#667eea', textDecoration: 'none', fontWeight: 600 }}>
                 Mot de passe oublié ?
-              </a>
+              </Link>
             </div>
 
             <button 
@@ -273,13 +273,11 @@ export default function LoginPage() {
           </form>
 
           <p style={{ textAlign: 'center', color: '#6b7280', fontSize: '0.875rem' }}>
-            Pas encore de compte ?{' '}
-            <Link to="/register" style={{ color: '#667eea', textDecoration: 'none', fontWeight: 600 }}>
-              Créer un compte
-            </Link>
+            Contactez l'administrateur pour obtenir vos accès.
           </p>
         </div>
       </div>
     </div>
   );
 }
+

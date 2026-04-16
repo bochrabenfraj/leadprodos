@@ -1,5 +1,5 @@
 import { useState, useContext, useEffect } from 'react'
-import { AuthContext } from '../context/AuthContext'
+import { AuthContext } from '../components/context/AuthContext'
 
 export default function UserProfilePage() {
   const { user, logout } = useContext(AuthContext)
@@ -143,9 +143,9 @@ export default function UserProfilePage() {
           </div>
 
           <button
-            onClick={() => setIsEditing(true)}
+            onClick={() => window.location.href = '/change-password'}
             style={{
-              backgroundColor: '#667eea',
+              backgroundColor: '#f97316',
               color: 'white',
               padding: '0.75rem 1.5rem',
               border: 'none',
@@ -155,13 +155,13 @@ export default function UserProfilePage() {
               marginRight: '1rem'
             }}
           >
-            ✏️ Éditer mon profil
+            🔐 Modifier mot de passe
           </button>
 
           <button
-            onClick={() => window.location.href = '/change-password'}
+            onClick={() => setIsEditing(true)}
             style={{
-              backgroundColor: '#10b981',
+              backgroundColor: '#667eea',
               color: 'white',
               padding: '0.75rem 1.5rem',
               border: 'none',
@@ -170,7 +170,7 @@ export default function UserProfilePage() {
               fontWeight: 600
             }}
           >
-            🔑 Changer mot de passe
+            ✏️ Éditer mon profil
           </button>
         </div>
       ) : (

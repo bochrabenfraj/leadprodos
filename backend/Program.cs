@@ -1,19 +1,47 @@
 using LeadProdos.Backend.Data;
 using LeadProdos.Backend.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using System.Text;
+using Microsoft.OpenApi.Models;
 using MongoDB.Driver;
+using Microsoft.OpenApi.Models;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Security.Cryptography;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-
+builder.Services.AddSwaggerGen(c =>
+{
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.ApiKey,
+        Scheme = "Bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Entrez: Bearer {votre token}"
+    });
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            new string[] {}
+        }
+    });
+});
 // Add DbContext
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? "mongodb://localhost:27017";
 var databaseName = builder.Configuration.GetConnectionString("DatabaseName") ?? "LeadProdosDb";
@@ -42,11 +70,23 @@ builder.Services.AddAuthentication(options =>
         ValidAudience = builder.Configuration["Jwt:Audience"] ?? "LeadProdosApp",
         ValidateLifetime = true,
         ClockSkew = TimeSpan.Zero,
-        RoleClaimType = "role"
+        RoleClaimType = "role",  // Map "role" from JWT to ClaimsIdentity roles
+        NameClaimType = "sub"
     };
 });
 
 builder.Services.AddAuthorization();
+
+// Configure JWT claims to roles mapping
+JwtSecurityTokenHandler.DefaultMapInboundClaims = false;
+
+// Add MongoDB Client and Database
+builder.Services.AddSingleton<IMongoClient>(new MongoClient(connectionString));
+builder.Services.AddScoped(provider => 
+{
+    var mongoClient = provider.GetRequiredService<IMongoClient>();
+    return mongoClient.GetDatabase(databaseName);
+});
 
 // Add Services
 builder.Services.AddScoped<IProductService, ProductService>();
@@ -55,13 +95,18 @@ builder.Services.AddScoped<ILeadService, LeadService>();
 builder.Services.AddScoped<IAIService, AIService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
+
+// Add MongoDB Services (direct driver access)
+builder.Services.AddScoped<MongoProductService>();
+builder.Services.AddScoped<MongoClientService>();
 
 // Add CORS
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll",
         builder => builder
-            .WithOrigins("http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://localhost:3003", "http://127.0.0.1:3000", "http://127.0.0.1:3001", "http://127.0.0.1:3002", "http://127.0.0.1:3003")
+            .WithOrigins("http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://localhost:3003", "http://localhost:3004", "http://127.0.0.1:3000", "http://127.0.0.1:3001", "http://127.0.0.1:3002", "http://127.0.0.1:3003", "http://127.0.0.1:3004")
             .AllowAnyMethod()
             .AllowAnyHeader()
             .AllowCredentials());
@@ -69,7 +114,7 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Initialize Admin User and Seed Data
+// Initialize Admin User and Seed Data (via Node.js script - more reliable with MongoDB)
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
@@ -77,14 +122,16 @@ using (var scope = app.Services.CreateScope())
     
     try
     {
-        // Data is pre-seeded via seed_db.js script - skip seeding on startup
+        // Just verify connection is working
+        _ = context.Users;
         Console.WriteLine("\n✅ Backend started successfully!");
-        Console.WriteLine("📧 Admin: admin@leadprosos.com | 🔑 Password: Admin@123");
-        Console.WriteLine("📦 Database ready!\n");
+        Console.WriteLine("📧 Admin: admin@leadprodos.com | 🔑 Password: Admin@123");
+        Console.WriteLine("📦 Database ready!");
+        Console.WriteLine("\n📝 To seed data, run: node seed_db.js\n");
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"⚠️ Startup info: {ex.Message}");
+        Console.WriteLine($"⚠️ Database connection error: {ex.Message}");
     }
 }
 

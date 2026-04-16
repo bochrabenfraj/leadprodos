@@ -11,5 +11,7 @@ namespace LeadProdos.Backend.Services
         Task<bool> ValidateTokenAsync(string token);
         Task<bool> ChangePasswordAsync(ChangePasswordRequest request);
         Task<bool> ResetPasswordAsync(ResetPasswordRequest request);
+        Task<bool> ForgotPasswordAsync(ForgotPasswordRequest request, string resetBaseUrl);
+        Task<bool> ResetPasswordWithTokenAsync(ResetPasswordWithTokenRequest request);
     }
 }

@@ -1,7 +1,28 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useContext } from 'react'
 import { getClients, createClient, deleteClient } from '../services/api'
+import { AuthContext } from '../components/context/AuthContext'
 
 export default function ClientsPage() {
+  const { user } = useContext(AuthContext)
+
+  // Si ce n'est pas un Admin, afficher un message d'accès refusé
+  if (!user || user.role !== 'Admin') {
+    return (
+      <div style={{
+        padding: '3rem',
+        textAlign: 'center',
+        color: '#991b1b',
+        background: '#fee2e2',
+        borderRadius: '8px',
+        maxWidth: '600px',
+        margin: '3rem auto',
+        border: '2px solid #fca5a5'
+      }}>
+        <h2>❌ Accès Refusé</h2>
+        <p>Seul l'administrateur peut gérer les clients.</p>
+      </div>
+    )
+  }
   const [clients, setClients] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -124,3 +145,4 @@ export default function ClientsPage() {
     </div>
   )
 }
+
