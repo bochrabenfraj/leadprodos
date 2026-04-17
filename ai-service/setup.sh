@@ -1,64 +1,46 @@
 #!/bin/bash
 
-# Script d'initialisation du microservice IA pour Linux/Mac
+# AI Service Setup Script for Linux/Mac
+# Creates virtual environment and installs dependencies
 
-echo ""
-echo "====================================================="
-echo "Initialisation du Microservice IA LeadProdos"
-echo "====================================================="
-echo ""
+echo "🚀 AI Service Setup (Linux/Mac)"
+echo "================================"
 
-# Créer le répertoire models
-if [ ! -d "models" ]; then
-    mkdir models
-    echo "[+] Repertoire 'models' cree"
-else
-    echo "[*] Repertoire 'models' deja existe"
-fi
-
-# Vérifier Python
+# Check if Python is installed
 if ! command -v python3 &> /dev/null; then
-    echo "[!] ERROR: Python 3 n'est pas installe"
+    echo "❌ Python3 is not installed. Please install Python 3.8+ first."
     exit 1
 fi
-echo "[+] Python 3 trouve: $(python3 --version)"
 
-# Créer l'environnement virtuel
-if [ ! -d "venv" ]; then
-    echo "[*] Creation de l'environnement virtuel..."
-    python3 -m venv venv
-    echo "[+] Environnement virtuel cree"
-else
-    echo "[*] Environnement virtuel existe deja"
-fi
+PYTHON_VERSION=$(python3 --version | awk '{print $2}')
+echo "✅ Python version: $PYTHON_VERSION"
 
-# Activer l'environnement virtuel
-echo "[*] Activation de l'environnement virtuel..."
+# Create virtual environment
+echo ""
+echo "📦 Creating virtual environment..."
+python3 -m venv venv
+
+# Activate virtual environment
+echo "🔌 Activating virtual environment..."
 source venv/bin/activate
 
-# Installer les dépendances
-echo "[*] Installation des dependances..."
+# Upgrade pip, setuptools, wheel
+echo ""
+echo "⚙️  Upgrading pip, setuptools, wheel..."
+pip install --upgrade pip setuptools wheel
+
+# Install requirements
+echo ""
+echo "📚 Installing dependencies from requirements.txt..."
 pip install -r requirements.txt
 
-# Créer .env s'il n'existe pas
-if [ ! -f ".env" ]; then
-    echo "[*] Creation du fichier .env..."
-    cp .env.example .env
-    echo "[+] Fichier .env cree (a configurer)"
-else
-    echo "[*] Fichier .env existe deja"
-fi
-
-# Rendre le script executable
-chmod +x setup.sh
-
 echo ""
-echo "====================================================="
-echo "Initialisation terminee!"
-echo "====================================================="
+echo "✅ Setup complete!"
 echo ""
-echo "Commandes utiles:"
-echo "  - Activer venv: source venv/bin/activate"
-echo "  - Lancer le service: python app.py"
-echo "  - Tester le service: python test_service.py"
+echo "To start the service, run:"
+echo "  source venv/bin/activate"
+echo "  python app.py"
 echo ""
+echo "To run tests, run in a separate terminal:"
+echo "  source venv/bin/activate"
+echo "  python test_service.py"
