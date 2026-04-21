@@ -1,18 +1,18 @@
 // Palette de couleurs professionnelle pour LeadProdos.ia
 export const colors = {
   // Couleurs primaires
-  primary: '#0891b2',           // Teal profond
-  primaryLight: '#06b6d4',      // Teal clair
-  primaryDark: '#0e7490',       // Teal foncé
+  primary: '#06b6d4',           // Cyan primaire
+  primaryLight: '#22d3ee',      // Cyan clair
+  primaryDark: '#0891b2',       // Cyan foncé
   
   // Couleurs secondaires
-  secondary: '#f59e0b',         // Gold/Amber
-  secondaryLight: '#fbbf24',    // Gold clair
-  secondaryDark: '#d97706',     // Gold foncé
+  secondary: '#f59e0b',         // Orange/Amber
+  secondaryLight: '#fbbf24',    // Orange clair
+  secondaryDark: '#d97706',     // Orange foncé
   
   // Couleurs de fond
   darkBg: '#0a0a0a',            // Fond très foncé (premium)
-  darkBgAlt: '#1a1a1a',         // Fond alternatif
+  darkBgAlt: '#111827',         // Fond alternatif
   lightBg: '#f9fafb',           // Fond clair
   white: '#ffffff',             // Blanc
   
@@ -23,7 +23,8 @@ export const colors = {
   errorLight: '#fee2e2',        // Rouge clair
   warning: '#f59e0b',           // Orange avertissement
   warningLight: '#fef3c7',      // Orange clair
-  info: '#06b6d4',              // Teal info
+  info: '#06b6d4',              // Cyan info
+  blue: '#3b82f6',              // Bleu action
   
   // Couleurs neutres
   gray50: '#f9fafb',
@@ -38,14 +39,14 @@ export const colors = {
   gray900: '#111827',
   
   // Gradients
-  gradientPrimary: 'linear-gradient(135deg, #0891b2 0%, #f59e0b 100%)',
-  gradientDark: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%)',
+  gradientPrimary: 'linear-gradient(135deg, #06b6d4 0%, #f59e0b 100%)',
+  gradientDark: 'linear-gradient(135deg, #0a0a0a 0%, #111827 100%)',
   gradientBg: 'linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%)',
   
   // Catégories
   categoryColors: {
-    'Général': '#0891b2',
-    'Électronique': '#06b6d4',
+    'Général': '#06b6d4',
+    'Électronique': '#3b82f6',
     'Vêtements': '#f59e0b',
     'Alimentation': '#10b981',
     'Services': '#8b5cf6',
